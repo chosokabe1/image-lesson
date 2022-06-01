@@ -3,8 +3,11 @@
 
 #define HEIGHT 256
 #define WIDTH  256
+#define IPR_GRAD_H 0
+#define IPR_GRAD_V 1
 
 typedef unsigned char uchar;
+void ipr_sobel(double sobel[][WIDTH], unsigned char image[][WIDTH], int direction);
 void sobel_horizontal(uchar image[][WIDTH], double sobel[][WIDTH]);
 void sobel_vertical(uchar image[][WIDTH], double sobel[][WIDTH]);
 void sobel_to_ppm(double sobel[][WIDTH], uchar image[][WIDTH][3]);
@@ -15,18 +18,25 @@ int main(int argc, char *argv[])
 {
     uchar src_image[HEIGHT][WIDTH];
     uchar dst_image[HEIGHT][WIDTH][3];
-    double sobelX[HEIGHT][WIDTH];
-    double sobelY[HEIGHT][WIDTH];
-
+    double sobel[HEIGHT][WIDTH];
 
     ipr_load_pgm(src_image, argv[1]);
-    sobel_horizontal(src_image, sobelX);
-    sobel_vertical(src_image, sobelY);
-    sobel_to_ppm(sobelY, dst_image);
-    ipr_save_ppm(dst_image, "hoge.ppm");
+    ipr_sobel(sobel, src_image, IPR_GRAD_H);
+    sobel_to_ppm(sobel, dst_image);
+    ipr_save_ppm(dst_image, argv[2]);
 
+    ipr_sobel(sobel, src_image, IPR_GRAD_V);
+    sobel_to_ppm(sobel, dst_image);
+    ipr_save_ppm(dst_image, argv[3]);
 
     return 0;
+}
+void ipr_sobel(double sobel[][WIDTH], unsigned char image[][WIDTH], int direction){
+    if( direction == IPR_GRAD_H){
+        sobel_horizontal(image, sobel);
+    } else if (direction == IPR_GRAD_V){
+        sobel_vertical(image, sobel);
+    }
 }
 void sobel_horizontal(uchar image[][WIDTH], double sobel[][WIDTH])
 {
