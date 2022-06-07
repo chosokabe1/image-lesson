@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define HEIGHT 256
-#define WIDTH  256
+#define HEIGHT 576
+#define WIDTH  768
 #define IPR_GRAD_H 0
 #define IPR_GRAD_V 1
 
@@ -10,27 +10,107 @@ typedef unsigned char uchar;
 void ipr_sobel(double sobel[][WIDTH], unsigned char image[][WIDTH], int direction);
 void sobel_horizontal(uchar image[][WIDTH], double sobel[][WIDTH]);
 void sobel_vertical(uchar image[][WIDTH], double sobel[][WIDTH]);
+void time_derivative(uchar image_t[][WIDTH], uchar image_pre[][WIDTH], double derivative[][WIDTH]);
 void sobel_to_ppm(double sobel[][WIDTH], uchar image[][WIDTH][3]);
 void ipr_load_pgm(uchar image[][WIDTH], const char path[]);
 void ipr_save_ppm(uchar image[][WIDTH][3], const char path[]);
 
 int main(int argc, char *argv[])
 {
-    uchar src_image[HEIGHT][WIDTH];
+    // uchar src_image[HEIGHT][WIDTH];
     uchar dst_image[HEIGHT][WIDTH][3];
-    double sobel[HEIGHT][WIDTH];
+    // double sobel[HEIGHT][WIDTH];
+    double derivative[HEIGHT][WIDTH];
 
-    ipr_load_pgm(src_image, argv[1]);
-    ipr_sobel(sobel, src_image, IPR_GRAD_H);
-    sobel_to_ppm(sobel, dst_image);
-    ipr_save_ppm(dst_image, argv[2]);
+    // ipr_load_pgm(src_image, argv[1]);
+    // ipr_sobel(sobel, src_image, IPR_GRAD_H);
+    // sobel_to_ppm(sobel, dst_image);
+    // ipr_save_ppm(dst_image, argv[2]);
 
-    ipr_sobel(sobel, src_image, IPR_GRAD_V);
-    sobel_to_ppm(sobel, dst_image);
+    // ipr_sobel(sobel, src_image, IPR_GRAD_V);
+    // sobel_to_ppm(sobel, dst_image);
+    // ipr_save_ppm(dst_image, argv[3]);
+
+    uchar image_t[HEIGHT][WIDTH];
+    uchar image_pre[HEIGHT][WIDTH];
+    ipr_load_pgm(image_t, argv[1]);
+    ipr_load_pgm(image_pre, argv[2]);
+    time_derivative(image_t, image_pre, derivative);
+    sobel_to_ppm(derivative, dst_image);
     ipr_save_ppm(dst_image, argv[3]);
 
     return 0;
 }
+void time_derivative(uchar image_t[][WIDTH], uchar image_pre[][WIDTH], double derivative[][WIDTH]){
+    /////
+    // 四隅の微分値の計算
+    /////
+    
+    // (0, 0) の計算
+    derivative[0][0]
+        = 2 * image_t[0][0] + image_t[0][0] + image_t[0][0] + image_t[1][0] + image_t[0][1] - 2 * image_pre[0][0] - image_pre[0][0] - image_pre[0][0] - image_pre[1][0] - image_pre[0][1];
+    
+    // (0, W - 1) の計算
+    derivative[0][WIDTH - 1]
+        = 2 * image_t[0][WIDTH - 1] + image_t[0][WIDTH - 1] + image_t[0][WIDTH - 1] + image_t[1][WIDTH - 1] + image_t[0][WIDTH - 2] - 2 * image_pre[0][WIDTH - 1] - image_pre[0][WIDTH - 1] - image_pre[0][WIDTH - 1] - image_pre[1][WIDTH - 1] - image_pre[0][WIDTH - 2];
+    
+    // (H - 1, 0) の計算
+    derivative[HEIGHT - 1][0]
+        = 2 * image_t[HEIGHT - 1][0] + image_t[HEIGHT - 1][0] + image_t[HEIGHT - 1][0] + image_t[HEIGHT - 2][0] + image_t[HEIGHT - 1][1] - 2 * image_pre[HEIGHT - 1][0] - image_pre[HEIGHT - 1][0] - image_pre[HEIGHT - 1][0] - image_pre[HEIGHT - 2][0] - image_pre[HEIGHT - 1][1];
+
+    // (H - 1, W - 1) の計算
+    derivative[HEIGHT - 1][WIDTH - 1]
+        = 2 * image_t[HEIGHT - 1][WIDTH - 1] + image_t[HEIGHT - 1][WIDTH - 1] + image_t[HEIGHT - 1][WIDTH - 1] + image_t[HEIGHT - 2][WIDTH - 1] + image_t[HEIGHT - 1][WIDTH - 2] - 2 * image_pre[HEIGHT - 1][WIDTH - 1] - image_pre[HEIGHT - 1][WIDTH - 1] - image_pre[HEIGHT - 1][WIDTH - 1] - image_pre[HEIGHT - 2][WIDTH - 1] - image_pre[HEIGHT - 1][WIDTH - 2];
+
+    /////
+    // 四隅を除く端の微分値の計算
+    /////
+    
+    // 上端である (0    , 1) -- (0    , W - 2) と
+    // 下端である (H - 1, 1) -- (H - 1, W - 2) の計算
+    for (int x = 1; x < WIDTH - 2; x++) {
+        derivative[0][x]
+            = 2 * image_t[0][x] + image_t[0][x] + image_t[0][x - 1] + image_t[1][x] + image_t[0][x + 1]
+            - 2 * image_pre[0][x] - image_pre[0][x] - image_pre[0][x - 1] - image_pre[1][x] - image_pre[0][x + 1];
+        
+        derivative[HEIGHT - 1][x]
+            = 2 * image_t[HEIGHT - 1][x] + image_t[HEIGHT - 2][x] + image_t[HEIGHT - 1][x - 1] + image_t[HEIGHT - 1][x] + image_t[HEIGHT - 1][x + 1]
+            - 2 * image_pre[HEIGHT - 1][x] - image_pre[HEIGHT - 2][x] - image_pre[HEIGHT - 1][x - 1] - image_pre[HEIGHT - 1][x] - image_pre[HEIGHT - 1][x + 1];
+    }
+
+    // 左端である (1, 0)     -- (H - 2, 0)     と
+    // 右端である (1, W - 1) -- (H - 2, W - 1) の計算
+    for (int y = 1; y < HEIGHT - 2; y++) {
+        derivative[y][0]
+            = 2 * image_t[y][0] + image_t[y - 1][0] + image_t[y][0] + image_t[y + 1][0] + image_t[y][1]
+            - 2 * image_pre[y][0] - image_pre[y - 1][0] - image_pre[y][0] - image_pre[y + 1][0] - image_pre[y][1];
+        
+        derivative[y][WIDTH - 1]
+            = 2 * image_t[y][WIDTH - 1] + image_t[y - 1][WIDTH - 1] + image_t[y][WIDTH - 1] + image_t[y + 1][WIDTH - 1] + image_t[y][WIDTH - 2]
+            - 2 * image_pre[y][WIDTH - 1] - image_pre[y - 1][WIDTH - 1] - image_pre[y][WIDTH - 1] - image_pre[y + 1][WIDTH - 1] - image_pre[y][WIDTH - 2];
+    }
+
+    /////
+    // 端を除く領域の計算
+    /////
+    for (int y = 1; y < HEIGHT - 1; y++) {
+        for (int x = 1; x < WIDTH - 1; x++) {
+            derivative[y][x]
+                = 2 * image_t[y][x] + image_t[y - 1][x] + image_t[y][x-1] + image_t[y + 1][x] + image_t[y][x+1]
+                - 2 * image_pre[y][x] - image_pre[y - 1][x] - image_pre[y][x-1] - image_pre[y + 1][x] - image_pre[y][x+1];
+        }
+    }
+
+    /////
+    // 正規化のために 1/6 倍する
+    /////
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            derivative[y][x] /= 6;
+        }
+    }
+}
+
 void ipr_sobel(double sobel[][WIDTH], unsigned char image[][WIDTH], int direction){
     if( direction == IPR_GRAD_H){
         sobel_horizontal(image, sobel);
