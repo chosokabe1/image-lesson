@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define HEIGHT 576
-#define WIDTH  768
+#define HEIGHT 256
+#define WIDTH  256
 #define IPR_GRAD_H 0
 #define IPR_GRAD_V 1
 
@@ -17,27 +17,28 @@ void ipr_save_ppm(uchar image[][WIDTH][3], const char path[]);
 
 int main(int argc, char *argv[])
 {
-    // uchar src_image[HEIGHT][WIDTH];
+    uchar src_image[HEIGHT][WIDTH];
     uchar dst_image[HEIGHT][WIDTH][3];
-    // double sobel[HEIGHT][WIDTH];
-    double derivative[HEIGHT][WIDTH];
+    double sobel[HEIGHT][WIDTH];
+    // double derivative[HEIGHT][WIDTH];
 
-    // ipr_load_pgm(src_image, argv[1]);
-    // ipr_sobel(sobel, src_image, IPR_GRAD_H);
-    // sobel_to_ppm(sobel, dst_image);
-    // ipr_save_ppm(dst_image, argv[2]);
+    ipr_load_pgm(src_image, argv[1]);
+    ipr_sobel(sobel, src_image, IPR_GRAD_H);
+    sobel_to_ppm(sobel, dst_image);
+    ipr_save_ppm(dst_image, argv[2]);
 
-    // ipr_sobel(sobel, src_image, IPR_GRAD_V);
-    // sobel_to_ppm(sobel, dst_image);
-    // ipr_save_ppm(dst_image, argv[3]);
-
-    uchar image_t[HEIGHT][WIDTH];
-    uchar image_pre[HEIGHT][WIDTH];
-    ipr_load_pgm(image_t, argv[1]);
-    ipr_load_pgm(image_pre, argv[2]);
-    time_derivative(image_t, image_pre, derivative);
-    sobel_to_ppm(derivative, dst_image);
+    ipr_sobel(sobel, src_image, IPR_GRAD_V);
+    sobel_to_ppm(sobel, dst_image);
     ipr_save_ppm(dst_image, argv[3]);
+
+    // 時間微分
+    // uchar image_t[HEIGHT][WIDTH];
+    // uchar image_pre[HEIGHT][WIDTH];
+    // ipr_load_pgm(image_t, argv[1]);
+    // ipr_load_pgm(image_pre, argv[2]);
+    // time_derivative(image_t, image_pre, derivative);
+    // sobel_to_ppm(derivative, dst_image);
+    // ipr_save_ppm(dst_image, argv[3]);
 
     return 0;
 }
