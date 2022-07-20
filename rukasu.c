@@ -169,7 +169,7 @@ void rukas_kanade(double flow[HEIGHT][WIDTH][2], double norm_5_flow[HEIGHT][WIDT
                 }
             }
             // v flow[y][x][0];
-            // u flow[y][x][1];
+            // u flow[y][x][1];横の動き
             if(sum_a_11 * sum_a_22 - sum_a_21 * sum_a_12 == 0){
                 printf("解なし");
                 n_kainasi++;
