@@ -15,53 +15,32 @@ void time_derivative(double derivative[][WIDTH], uchar image_t[][WIDTH], uchar i
 void sobel_to_ppm(double sobel[][WIDTH], uchar image[][WIDTH][3]);
 void ipr_load_pgm(uchar image[][WIDTH], const char path[]);
 void ipr_save_ppm(uchar image[][WIDTH][3], const char path[]);
-void rukas_kanade(double flow[HEIGHT][WIDTH][2], double norm_5_flow[HEIGHT][WIDTH][2], double soble_x[HEIGHT][WIDTH], double sobel_y[HEIGHT][WIDTH], double derivative_t[HEIGHT][WIDTH]);
+void rukas_kanade(double flow[HEIGHT][WIDTH][2], double soble_x[HEIGHT][WIDTH], double sobel_y[HEIGHT][WIDTH], double derivative_t[HEIGHT][WIDTH]);
 void save_flow(double flow[HEIGHT][WIDTH][2], const char path[]);
-void save_flow5(double flow[HEIGHT][WIDTH][2], const char path[]);
-void norm_minus1_plus1(double derivative[HEIGHT][WIDTH], double norm_derivative[HEIGHT][WIDTH]);
-void flow_size7(double flow[HEIGHT][WIDTH][2], double flow7[HEIGHT][WIDTH][2]);
 
-// int main(int argc, char *argv[])
-int main(void)
+
+int main(int argc, char *argv[])
 {
     uchar dst_image[HEIGHT][WIDTH][3];
     double sobelX[HEIGHT][WIDTH];
-    double norm_sobelX[HEIGHT][WIDTH];
     double sobelY[HEIGHT][WIDTH];
-    double norm_sobelY[HEIGHT][WIDTH];
     double derivative_t[HEIGHT][WIDTH];
-    double norm_derivative_t[HEIGHT][WIDTH];
     double flow[HEIGHT][WIDTH][2];
-    double flow7[HEIGHT][WIDTH][2];
-    double norm_5_flow[HEIGHT][WIDTH][2];
     uchar image_t[HEIGHT][WIDTH];
     uchar image_pre[HEIGHT][WIDTH];
 
-    // コマンドライン引数使うとき
-    // ipr_load_pgm(image_t, argv[1]);
-    // ipr_load_pgm(image_pre, argv[2]);
-
-    // コマンドライン引数めんどくさいとき
-    // image_preは１時刻前の画像
-    ipr_load_pgm(image_t, "frame_0001.pgm");
-    ipr_load_pgm(image_pre, "frame_0000.pgm");
+    ipr_load_pgm(image_t, argv[1]);
+    ipr_load_pgm(image_pre, argv[2]);
 
     // sobelフィルタ
     ipr_sobel(sobelX, image_t, IPR_GRAD_H);
     ipr_sobel(sobelY, image_t, IPR_GRAD_V);
     // 時間微分
     time_derivative(derivative_t, image_t, image_pre);
-    norm_minus1_plus1(sobelX, norm_sobelX);
-    norm_minus1_plus1(sobelY, norm_sobelY);
-    norm_minus1_plus1(derivative_t, norm_derivative_t);
 
-    // rukas_kanade(flow, norm_5_flow, sobelX, sobelY, derivative_t);
-    rukas_kanade(flow, norm_5_flow, norm_sobelX, norm_sobelY, norm_derivative_t);
+    rukas_kanade(flow, sobelX, sobelY, derivative_t);
 
-    flow_size7(flow, flow7);
-    save_flow5(flow, "flow.dat");
-    save_flow5(norm_5_flow, "norm_5_flow.dat");
-    save_flow5(flow7, "flow7.dat");
+    save_flow(flow, "flow.dat");
     sobel_to_ppm(sobelX, dst_image);
     ipr_save_ppm(dst_image, "sobelx.ppm");
     sobel_to_ppm(sobelY, dst_image);
@@ -70,58 +49,6 @@ int main(void)
     ipr_save_ppm(dst_image, "derivative_t.ppm");
 
     return 0;
-}
-void save_flow5(double flow[HEIGHT][WIDTH][2], const char path[]){
-    FILE *fp;
-
-    fp = fopen(path, "w");
-    for(int x = 0; x < WIDTH; x++){
-        for(int y = 0; y < HEIGHT; y++){
-            if(x % 3 == 0 && y % 3 == 0){
-                fprintf(fp, "%d %d %.3f %.3f\n", x*7, y*7, flow[HEIGHT - y - 1][x][1]*30, (-1) * flow[HEIGHT - y - 1 ][x][0]*30);
-            }
-        }
-    }
-    fclose(fp);
-}
-void norm_minus1_plus1(double derivative[HEIGHT][WIDTH], double norm_derivative[HEIGHT][WIDTH]){
-    double min = 0;
-    double max = 0;
-
-    for(int x = 0; x < WIDTH; x++){
-        for(int y = 0; y < HEIGHT; y++){
-            if(derivative[y][x] > max){
-                max = derivative[y][x];
-            }
-            if(derivative[y][x] < min){
-                min = derivative[y][x];
-            }
-        }
-    }
-    for(int x = 0; x < WIDTH; x++){
-        for(int y = 0; y < HEIGHT; y++){
-            if(derivative[y][x] >= 0){
-                norm_derivative[y][x] = derivative[y][x] / max;
-            } else {
-                norm_derivative[y][x] = (-1) * derivative[y][x] / min;
-            }
-        }
-    }
-
-}
-void flow_size7(double flow[HEIGHT][WIDTH][2], double flow7[HEIGHT][WIDTH][2]){
-    for(int x = 0; x < WIDTH; x++){
-        for(int y = 0; y < HEIGHT; y++){
-            double length = sqrt(pow(flow[y][x][0], 2.0) + pow(flow[y][x][1], 2.0));
-            if (length == 0){
-                flow7[y][x][0] = 0;
-                flow7[y][x][1] = 0;
-            } else {
-                flow7[y][x][0] = flow[y][x][0] * 7 / length;
-                flow7[y][x][1] = flow[y][x][1] * 7 / length;
-            }
-        }
-    }
 }
 void save_flow(double flow[HEIGHT][WIDTH][2], const char path[]){
     FILE *fp;
@@ -134,7 +61,7 @@ void save_flow(double flow[HEIGHT][WIDTH][2], const char path[]){
     }
     fclose(fp);
 }
-void rukas_kanade(double flow[HEIGHT][WIDTH][2], double norm_5_flow[HEIGHT][WIDTH][2], double sobel_x[HEIGHT][WIDTH], double sobel_y[HEIGHT][WIDTH], double derivative_t[HEIGHT][WIDTH]){
+void rukas_kanade(double flow[HEIGHT][WIDTH][2], double sobel_x[HEIGHT][WIDTH], double sobel_y[HEIGHT][WIDTH], double derivative_t[HEIGHT][WIDTH]){
     //最小二乗法の行列計算に使う和
     double sum_a_11, sum_a_12;
     double sum_a_21, sum_a_22;
@@ -146,15 +73,12 @@ void rukas_kanade(double flow[HEIGHT][WIDTH][2], double norm_5_flow[HEIGHT][WIDT
 
     int n_kainasi = 0;
     int n_kaiari = 0;
-    double flow_abs_max = 0;
-    // for(int x = 100; x < 380; x++) {
-    //     for(int y = 150; y < 400; y++) {
     for(int x = start_end; x < WIDTH - start_end; x++) {
         for(int y = start_end; y < HEIGHT - start_end; y++) {
             // flow[y][x][0] と flow[y][x][1] の計算を行う。
             // pow(x, 2.0); 引数と戻り値の型はdouble
             sum_a_11 = sum_a_12 = sum_a_21 = sum_a_22 = sum_b_1 = sum_b_2 = 0;
-            printf("x = [%d], y = [%d]\n", x, y);
+            // printf("x = [%d], y = [%d]\n", x, y);
             for(int k = -2; k <= 2; k++){
                 for(int l = -2; l <= 2; l++){
                     sum_a_11 += sobel_x[y + l][x + k] * sobel_x[y + l][x + k];
@@ -171,33 +95,19 @@ void rukas_kanade(double flow[HEIGHT][WIDTH][2], double norm_5_flow[HEIGHT][WIDT
             // v flow[y][x][0];
             // u flow[y][x][1];横の動き
             if(sum_a_11 * sum_a_22 - sum_a_21 * sum_a_12 == 0){
-                printf("解なし");
+                // printf("解なし");
                 n_kainasi++;
                 flow[y][x][0] = 0;
                 flow[y][x][1] = 0;
             } else {
                 n_kaiari++;
                 flow[y][x][0] = (sum_a_22*sum_b_1 - sum_a_12*sum_b_2) / (sum_a_11*sum_a_22 - sum_a_21*sum_a_12);
-                if(fabs(flow[y][x][0]) > flow_abs_max){
-                    flow_abs_max = fabs(flow[y][x][0]);
-                }
                 flow[y][x][1] = (sum_a_11*sum_b_2 - sum_a_21*sum_b_1) / (sum_a_11*sum_a_22 - sum_a_21*sum_a_12);
-                if(fabs(flow[y][x][1]) > flow_abs_max){
-                    flow_abs_max = fabs(flow[y][x][1]);
-                }
             }
         }
     }
-    // for(int x = 100; x < 380; x++) {
-    //     for(int y = 150; y < 400; y++) {
-    for(int x = start_end; x < WIDTH - start_end; x++) {
-        for(int y = start_end; y < HEIGHT - start_end; y++) {
-            for(int i = 0; i < 2; i++){
-                norm_5_flow[y][x][i] = flow[y][x][i] / flow_abs_max * 400;
-            }
-        }
-    }
-    printf("解なし：%d,解あり:%d", n_kainasi, n_kaiari);
+
+    // printf("解なし：%d,解あり:%d", n_kainasi, n_kaiari);
 }
 
 void time_derivative(double derivative[][WIDTH], uchar image_t[][WIDTH], uchar image_pre[][WIDTH]){
