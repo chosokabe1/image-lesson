@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #define WIDTH           640     // 画像の横画素数
 #define HEIGHT          480     // 画像の縦画素数
@@ -80,14 +81,13 @@ int main(int argc, char *argv[])
     int x, y;
     int ms_vector_x, ms_vector_y;
     int iteration;
-
-
+    char buf[1024];
+    char buf1[1024];
+    unsigned char image[HEIGHT][WIDTH];
     // モデルの生成
     ipr_load_model(model_image, argv[1]);
     set_kernel(kernel);
     calc_histogram(model_hist, model_image, kernel);
-
-    
     // 矩形の初期位置の設定（追跡対象のサイズは不変で，モデルのサイズと同一）
     //   Web のサンプルを完成させて実行すると，
     //   類似度最大となる矩形の左上位置は (362, 187) であることがわかる．
@@ -95,66 +95,65 @@ int main(int argc, char *argv[])
     x = 340;
     y = 160;
 
-    
-    // 原画像（src_image）と結果表示用の画像（dst_image）を入力
-    ipr_load_ppm(src_image, argv[2]);
-    ipr_load_ppm(dst_image, argv[2]);
+    for (int frame = 300; frame < 400; frame++){
+        sprintf(buf, "./src_image/MVI_0182-%07d.ppm", frame);
+        ipr_load_ppm(src_image, buf);
+        ipr_load_ppm(dst_image, buf);
 
-    
-    // 初期位置を青色で表示
-    display_center_mark(dst_image, x + RADIUS_WIDTH, y + RADIUS_HEIGHT, BLUE);
-    display_rectangle(dst_image, x, y, MODEL_WIDTH, MODEL_HEIGHT, BLUE);
+        // 初期位置を青色で表示
+        display_center_mark(dst_image, x + RADIUS_WIDTH, y + RADIUS_HEIGHT, BLUE);
+        display_rectangle(dst_image, x, y, MODEL_WIDTH, MODEL_HEIGHT, BLUE);
+            // 類似度が極大となる位置の探索を開始
+        iteration = 0;
+        do {
+ 
+            // 矩形領域をコピーして，矩形領域のヒストグラムを計算
+            copy_region(src_image, region_image, x, y);
+            calc_histogram(candidate_hist, region_image, kernel);
 
-    
-    // 類似度が極大となる位置の探索を開始
-    iteration = 0;
-    do {
+            // 重みを計算
+            calc_weight(weight, region_image, model_hist, candidate_hist);
 
-        // 矩形領域をコピーして，矩形領域のヒストグラムを計算
-        copy_region(src_image, region_image, x, y);
-        calc_histogram(candidate_hist, region_image, kernel);
+            // 重みの重心を算出して移動量を計算
+            calc_mean_shift_vector(&ms_vector_x, &ms_vector_y, weight, kernel);
+            printf("%2d %3d %3d\n", iteration, ms_vector_x, ms_vector_y);
+            /*
+              「探索回数   x方向の移動量   y方向の移動量」が表示される
+              その結果が
+                  0  11   9
+                  1   5   6
+                  2   3   5
+                  3   1   2
+                  4   1   2
+                  5   0   1
+                  6   0   1
+                  7   0   0
+              であれば，多分正解．
+            */
 
-        // 重みを計算
-        calc_weight(weight, region_image, model_hist, candidate_hist);
 
-        // 重みの重心を算出して移動量を計算
-        calc_mean_shift_vector(&ms_vector_x, &ms_vector_y, weight, kernel);
-        printf("%2d %3d %3d\n", iteration, ms_vector_x, ms_vector_y);
-        /*
-          「探索回数   x方向の移動量   y方向の移動量」が表示される
-          その結果が
-              0  11   9
-              1   5   6
-              2   3   5
-              3   1   2
-              4   1   2
-              5   0   1
-              6   0   1
-              7   0   0
-          であれば，多分正解．
-        */
-        
-        // 枠を移動する
-        x += ms_vector_x;
-        y += ms_vector_y;
-        
-        iteration++;
+            // 枠を移動する
+            x += ms_vector_x;
+            y += ms_vector_y;
 
-        
-        // 探索途中の領域の中心を緑色で表示
-        display_center_mark(dst_image, x + RADIUS_WIDTH, y + RADIUS_HEIGHT, GREEN);
+            iteration++;
 
-    } while ( iteration < MAX_ITERATION && (ms_vector_x != 0 || ms_vector_y != 0) ); 
-    // 継続条件は，
-    //   反復回数が指定した最大回数に達しておらず，かつ，
-    //   (x 方向の移動がある，または，y 方向の移動がある)
 
-    
-    // 最終結果を赤色で表示
-    display_center_mark(dst_image, x + RADIUS_WIDTH, y + RADIUS_HEIGHT, RED);
-    display_rectangle(dst_image, x, y, MODEL_WIDTH, MODEL_HEIGHT, RED);
-    ipr_save_ppm(dst_image, "result.ppm");
-    
+            // 探索途中の領域の中心を緑色で表示
+            display_center_mark(dst_image, x + RADIUS_WIDTH, y + RADIUS_HEIGHT, GREEN);
+
+        } while ( iteration < MAX_ITERATION && (ms_vector_x != 0 || ms_vector_y != 0) ); 
+        // 継続条件は，
+        //   反復回数が指定した最大回数に達しておらず，かつ，
+        //   (x 方向の移動がある，または，y 方向の移動がある)
+
+
+        // 最終結果を赤色で表示
+        display_center_mark(dst_image, x + RADIUS_WIDTH, y + RADIUS_HEIGHT, RED);
+        display_rectangle(dst_image, x, y, MODEL_WIDTH, MODEL_HEIGHT, RED);
+        sprintf(buf1, "./dst_image/MVI_0182-%07d.ppm", frame);
+        ipr_save_ppm(dst_image, buf1);
+    }
     return 0;
 }
 
@@ -168,22 +167,38 @@ void calc_histogram(double hist[], unsigned char image[][MODEL_WIDTH][3],
                     double kernel[][MODEL_WIDTH])
 {
     int x, y;
-    
+
     // ヒストグラムをゼロで初期化
-    
+    for (int i = 0; i < NBIN; i++){
+        hist[i] = 0.0;
+    }
     // 重み付きヒストグラムを算出
     for (y = 0; y < MODEL_HEIGHT; y++) {
         for (x = 0; x < MODEL_WIDTH; x++) {
-            
+
             // RGB値から色番号に変換
-            
+            // image[y][x][0] 赤
+            // image[y][x][1] 緑
+            // image[y][x][2] 青
             // 色番号のビンに，カーネルの値をインクリメント
-            
+            int r_Q, g_Q, b_Q;
+            r_Q = image[y][x][0] / Q_SIZE;
+            g_Q = image[y][x][1] / Q_SIZE;
+            b_Q = image[y][x][2] / Q_SIZE;
+            hist[b_Q * Q_SIZE * Q_SIZE + g_Q * Q_SIZE + r_Q] += kernel[y][x];
         }
     }
-    
-    // ヒストグラムの正規化
 
+    // ヒストグラムの正規化
+    double sum_kernel = 0.0;
+    for (y = 0; y < MODEL_HEIGHT; y++) {
+        for (x = 0; x < MODEL_WIDTH; x++) {
+            sum_kernel += kernel[y][x];
+        }
+    }
+    for (int i = 0; i < NBIN; i++){
+        hist[i] /= sum_kernel;
+    }
 }
 
 
@@ -197,11 +212,15 @@ void calc_weight(double weight[][MODEL_WIDTH], unsigned char image[][MODEL_WIDTH
         for (x = 0; x < MODEL_WIDTH; x++) {
             
             // RGB値から色番号に変換
-
+            int r_Q, g_Q, b_Q;
+            r_Q = image[y][x][0] / Q_SIZE;
+            g_Q = image[y][x][1] / Q_SIZE;
+            b_Q = image[y][x][2] / Q_SIZE;
+            int color_number = b_Q * Q_SIZE * Q_SIZE + g_Q * Q_SIZE + r_Q;
             // 計算式に従って重みを算出
             //   スライドのように，色番号 u でループを回すのは非効率 
             //   クロネッカーのデルタの性質を利用して効率化を図りましょう
-            
+            weight[y][x] = sqrt(model_hist[color_number] / candidate_hist[color_number]);
         }
     }
 }
@@ -218,9 +237,9 @@ void calc_mean_shift_vector(int *mx, int *my,
     // 移動量の算出は，分子の x 座標と y 座標，分母に分けて累算すれば簡単
     for (y = 0; y < MODEL_HEIGHT; y++) {
         for (x = 0; x < MODEL_WIDTH; x++) {
-            num_x += 
-            num_y += 
-            dum += 
+            num_x += weight[y][x] * x * kernel[y][x];
+            num_y += weight[y][x] * y * kernel[y][x];
+            dum += weight[y][x] * kernel[y][x];
         }
     }
 
@@ -234,8 +253,9 @@ double calc_bhattacharrya(double hist1[], double hist2[])
 {
     // 正規化されたヒストグラムのバタッチャリヤ係数を計算
     double bhatt = 0.0;
-    
-    
+    for (int i = 0; i < NBIN; i++){
+        bhatt += sqrt(hist1[i] * hist2[i]);
+    }
     return bhatt;
 }
 
