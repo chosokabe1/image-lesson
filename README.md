@@ -4,4 +4,4 @@
 ルーカス　カナデの方法を用いました。
 
 ## 参考文献
-[1]OpenCV, "オプティカルフロー", http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_video/py_lucas_kanade/py_lucas_kanade.html,参照:2022/12/01
+[1]OpenCV, "オプティカルフロー", http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_video/py_lucas_kanade/py_lucas_kanade.html  ,  参照:2022/12/01
